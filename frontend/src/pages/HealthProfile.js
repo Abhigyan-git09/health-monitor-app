@@ -251,12 +251,20 @@ const HealthProfile = () => {
                 </Tab.Pane>
                 
                 <Tab.Pane active={activeTab === 'documents'}>
-                  <DocumentUpload
-                    documents={healthProfile?.documents || []}
-                    onUpload={handleDocumentUpload}
-                    loading={saving}
-                  />
-                </Tab.Pane>
+                    <DocumentUpload
+                        documents={healthProfile?.documents || []}
+                        onUpload={handleDocumentUpload}
+                        onTakeTest={() => {
+                        // You can redirect to a test page or show a modal
+                        alert('Health test feature will be implemented in Phase 4! For now, please complete the other sections of your health profile.');
+                        // Or redirect to basic info if not completed
+                        if (!healthProfile?.completionStatus?.basicInfo) {
+                            setActiveTab('basic-info');
+                        }
+                        }}
+                        loading={saving}
+                    />
+                    </Tab.Pane>
               </Tab.Content>
             </Card.Body>
           </Card>

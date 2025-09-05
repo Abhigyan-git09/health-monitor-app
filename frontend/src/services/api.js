@@ -75,5 +75,41 @@ export const healthAPI = {
   }
 };
 
+// Food API calls
+export const foodAPI = {
+  // Search foods in USDA database
+  searchFoods: async (query, limit = 20) => {
+    const response = await api.get('/food/search', {
+      params: { q: query, limit }
+    });
+    return response.data;
+  },
+  
+  // Get detailed food information
+  getFoodDetails: async (fdcId) => {
+    const response = await api.get(`/food/usda/${fdcId}`);
+    return response.data;
+  },
+  
+  // Create food order
+  createOrder: async (orderData) => {
+    const response = await api.post('/food/order', orderData);
+    return response.data;
+  },
+  
+  // Get user's orders
+  getUserOrders: async (params = {}) => {
+    const response = await api.get('/food/orders', { params });
+    return response.data;
+  },
+  
+  // Get specific order
+  getOrder: async (orderId) => {
+    const response = await api.get(`/food/order/${orderId}`);
+    return response.data;
+  }
+};
+
+
 
 export default api;

@@ -27,6 +27,7 @@ app.use(cors({
 app.use('/api/auth', require('./routes/auth'));
 // Add this line with your other routes
 app.use('/api/health', require('./routes/health'));
+app.use('/api/food', require('./routes/food'));
 
 // Basic route
 app.get('/', (req, res) => {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card, Form, Button, Alert, ListGroup, Badge } from 'react-bootstrap';
 
-const DocumentUpload = ({ documents = [], onUpload, loading }) => {
+const DocumentUpload = ({ documents = [], onUpload, onTakeTest, loading }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [documentType, setDocumentType] = useState('medical-report');
   const [notes, setNotes] = useState('');
@@ -32,7 +32,7 @@ const DocumentUpload = ({ documents = [], onUpload, loading }) => {
     e.preventDefault();
     
     if (!selectedFile) {
-      setError('Please select a file to upload');
+      setError('Please select a file to upload or use the "Take Health Test" option instead');
       return;
     }
 
@@ -91,15 +91,53 @@ const DocumentUpload = ({ documents = [], onUpload, loading }) => {
   return (
     <Card>
       <Card.Header>
-        <h5 className="mb-0">📄 Medical Documents</h5>
+        <h5 className="mb-0">📄 Medical Documents or Health Test</h5>
       </Card.Header>
       <Card.Body>
         {error && <Alert variant="danger">{error}</Alert>}
         
+        {/* Two Options Section */}
+        <div className="mb-4">
+          <h6>Choose an option:</h6>
+          <div className="d-grid gap-2 d-md-flex">
+            <div className="flex-fill">
+              <Card className="border-primary h-100">
+                <Card.Body className="text-center">
+                  <div style={{fontSize: '2rem'}}>📄</div>
+                  <h6>Upload Medical Document</h6>
+                  <p className="small text-muted">If you have medical reports, test results, or prescriptions</p>
+                </Card.Body>
+              </Card>
+            </div>
+            <div className="text-center align-self-center">
+              <strong>OR</strong>
+            </div>
+            <div className="flex-fill">
+              <Card className="border-success h-100">
+                <Card.Body className="text-center">
+                  <div style={{fontSize: '2rem'}}>🩺</div>
+                  <h6>Take Health Test</h6>
+                  <p className="small text-muted">Answer questions about your current health status</p>
+                  <Button 
+                    variant="success" 
+                    onClick={onTakeTest} 
+                    disabled={loading}
+                    className="w-100"
+                  >
+                    Start Health Test
+                  </Button>
+                </Card.Body>
+              </Card>
+            </div>
+          </div>
+        </div>
+
         {/* Upload Form */}
         <Form onSubmit={handleUpload} className="mb-4">
+          <h6>Upload Medical Document (Optional)</h6>
+          
           <Form.Group className="mb-3">
-            <Form.Label>Upload Medical Document</Form.Label>
+            <Form.Label>Select Medical Document</Form.Label>
             <Form.Control
               type="file"
               id="document-upload"
@@ -172,7 +210,7 @@ const DocumentUpload = ({ documents = [], onUpload, loading }) => {
           <div className="text-center py-4">
             <div style={{fontSize: '3rem', opacity: 0.3}}>📄</div>
             <p className="text-muted">No documents uploaded yet</p>
-            <small className="text-muted">Upload your medical reports, test results, or prescriptions</small>
+            <small className="text-muted">Upload your medical reports or take the health test to get started</small>
           </div>
         )}
       </Card.Body>

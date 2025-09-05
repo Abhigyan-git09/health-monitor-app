@@ -10,6 +10,7 @@ import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import Dashboard from './pages/Dashboard';
 import HealthProfile from './pages/HealthProfile';
+import FoodTracking from './pages/FoodTracking';  // Add this import
 
 // Import AuthContext
 import { AuthProvider } from './contexts/AuthContext';
@@ -38,6 +39,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <HealthProfile />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/food-tracking" 
+                element={
+                  <ProtectedRoute>
+                    <FoodTracking />
                   </ProtectedRoute>
                 } 
               />
