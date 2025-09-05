@@ -36,4 +36,44 @@ export const authAPI = {
   }
 };
 
+// Add this to your existing api.js file, after authAPI
+
+// Health API calls
+export const healthAPI = {
+  getProfile: async () => {
+    const response = await api.get('/health/profile');
+    return response.data;
+  },
+  
+  updateBasicInfo: async (data) => {
+    const response = await api.put('/health/basic-info', data);
+    return response.data;
+  },
+  
+  updateMedicalHistory: async (data) => {
+    const response = await api.put('/health/medical-history', data);
+    return response.data;
+  },
+  
+  updateDietaryInfo: async (data) => {
+    const response = await api.put('/health/dietary-info', data);
+    return response.data;
+  },
+  
+  updateLifestyle: async (data) => {
+    const response = await api.put('/health/lifestyle', data);
+    return response.data;
+  },
+  
+  uploadDocument: async (formData) => {
+    const response = await api.post('/health/upload-document', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  }
+};
+
+
 export default api;

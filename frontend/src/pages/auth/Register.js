@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Container, Row, Col, Card, Form, Button, Alert } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import { authAPI } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -13,6 +14,7 @@ const Register = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const { name, email, password, confirmPassword } = formData;
 
@@ -42,13 +44,12 @@ const Register = () => {
       const response = await authAPI.register({ name, email, password });
       
       if (response.success) {
-        // Store token and user data
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify({
+        // Use AuthContext login function
+        login(response.data.token, {
           id: response.data._id,
           name: response.data.name,
           email: response.data.email
-        }));
+        });
         
         // Redirect to dashboard
         navigate('/dashboard');
