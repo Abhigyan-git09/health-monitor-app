@@ -1,292 +1,254 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Alert, Spinner, Button } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
-import { authAPI, healthAPI } from '../services/api';
-import '../styles/dashboard.css';
+import { Container, Row, Col, Card, Button, Alert, Badge } from 'react-bootstrap';
+import { useAuth } from '../contexts/AuthContext';
+import { healthAPI, foodAPI, mlAPI } from '../services/api';
 
 const Dashboard = () => {
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [healthProfile, setHealthProfile] = useState(null);
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [quickInsights, setQuickInsights] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchUserData();
+    fetchDashboardData();
   }, []);
 
-  const fetchUserData = async () => {
+  const fetchDashboardData = async () => {
     try {
-      const [userResponse, healthResponse] = await Promise.all([
-        authAPI.getProfile(),
-        healthAPI.getProfile()
-      ]);
-      
-      if (userResponse.success) {
-        setUser(userResponse.data);
+      // Fetch health profile
+      const profileResponse = await healthAPI.getHealthProfile();
+      if (profileResponse.success) {
+        setHealthProfile(profileResponse.data);
       }
-      
-      if (healthResponse.success) {
-        setHealthProfile(healthResponse.data);
+
+      // Fetch recent orders
+      const ordersResponse = await foodAPI.getUserOrders({ limit: 5 });
+      if (ordersResponse.success) {
+        setRecentOrders(ordersResponse.data);
+      }
+
+      // Fetch quick insights if user has data
+      if (profileResponse.data && ordersResponse.data.length > 0) {
+        const insightsResponse = await mlAPI.getHealthRiskAssessment();
+        if (insightsResponse.success) {
+          setQuickInsights(insightsResponse.risk_assessment);
+        }
       }
     } catch (error) {
-      console.error('Fetch user data error:', error);
-      setError('Failed to load dashboard data');
+      console.error('Dashboard data error:', error);
     } finally {
       setLoading(false);
     }
   };
 
+  const getCompletionBadge = (status) => {
+    if (status >= 80) return <Badge bg="success">Complete</Badge>;
+    if (status >= 50) return <Badge bg="warning">In Progress</Badge>;
+    return <Badge bg="secondary">Not Started</Badge>;
+  };
+
+  const getHealthScoreColor = (score) => {
+    if (score >= 80) return 'success';
+    if (score >= 60) return 'warning';
+    return 'danger';
+  };
+
   if (loading) {
     return (
-      <Container className="text-center dashboard-container">
-        <Spinner animation="border" role="status" variant="primary" size="lg">
-          <span className="visually-hidden">Loading...</span>
-        </Spinner>
-        <p className="mt-3 text-muted">Loading your dashboard...</p>
+      <Container className="mt-4">
+        <div className="text-center">
+          <div style={{fontSize: '3rem'}}>⏳</div>
+          <p>Loading your health dashboard...</p>
+        </div>
       </Container>
     );
   }
 
-  const completionPercentage = healthProfile?.completionStatus?.overallCompletion || 0;
-  const documentsCount = healthProfile?.documents?.length || 0;
-
   return (
-    <div className="dashboard-container">
-      <Container>
-        {/* Welcome Header */}
-        <Row>
-          <Col md={12}>
-            <Card className="welcome-card">
-              <Card.Body className="text-center py-4">
-                <h2>Welcome back, {user?.name}! 👋</h2>
-                <p className="mb-0">Your health monitoring dashboard is ready to help you stay healthy</p>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-        
-        {error && (
-          <Row>
-            <Col md={12}>
-              <Alert variant="danger">{error}</Alert>
-            </Col>
-          </Row>
-        )}
+    <Container className="mt-4">
+      <Row>
+        <Col md={12}>
+          <div className="d-flex justify-content-between align-items-center mb-4">
+            <div>
+              <h2>Welcome back, {user?.name}! 👋</h2>
+              <p className="text-muted">Here's your health overview</p>
+            </div>
+          </div>
+        </Col>
+      </Row>
 
-        {/* Stats Cards */}
-        <Row className="mb-4">
-          <Col md={3} sm={6} className="mb-3">
-            <Card className="stats-card h-100">
-              <Card.Body className="text-center">
-                <div style={{fontSize: '2rem', color: '#007bff'}}>📊</div>
-                <h6 className="mt-2">Profile Completion</h6>
-                <h4 className="text-primary">{completionPercentage}%</h4>
-                <small className="text-muted">
-                  {completionPercentage < 50 ? 'Getting Started' : 
-                   completionPercentage < 100 ? 'Almost Done' : 'Complete'}
-                </small>
-              </Card.Body>
-            </Card>
-          </Col>
-          
-          <Col md={3} sm={6} className="mb-3">
-            <Card className="stats-card h-100">
-              <Card.Body className="text-center">
-                <div style={{fontSize: '2rem', color: '#28a745'}}>🍎</div>
-                <h6 className="mt-2">Foods Tracked</h6>
-                <h4 className="text-success">0</h4>
-                <small className="text-muted">Coming in Phase 3</small>
-              </Card.Body>
-            </Card>
-          </Col>
-          
-          <Col md={3} sm={6} className="mb-3">
-            <Card className="stats-card h-100">
-              <Card.Body className="text-center">
-                <div style={{fontSize: '2rem', color: '#ffc107'}}>⚠️</div>
-                <h6 className="mt-2">Health Alerts</h6>
-                <h4 className="text-warning">0</h4>
-                <small className="text-muted">No alerts</small>
-              </Card.Body>
-            </Card>
-          </Col>
-          
-          <Col md={3} sm={6} className="mb-3">
-            <Card className="stats-card h-100">
-              <Card.Body className="text-center">
-                <div style={{fontSize: '2rem', color: '#17a2b8'}}>📄</div>
-                <h6 className="mt-2">Documents</h6>
-                <h4 className="text-info">{documentsCount}</h4>
-                <small className="text-muted">Uploaded</small>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
+      {/* Quick Stats */}
+      <Row className="mb-4">
+        <Col md={3}>
+          <Card className="text-center h-100">
+            <Card.Body>
+              <div style={{fontSize: '2rem'}}>📋</div>
+              <h4>{healthProfile ? `${Math.round(healthProfile.completionPercentage || 0)}%` : '0%'}</h4>
+              <small>Profile Complete</small>
+              <div className="mt-2">
+                {getCompletionBadge(healthProfile?.completionPercentage || 0)}
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+        <Col md={3}>
+          <Card className="text-center h-100">
+            <Card.Body>
+              <div style={{fontSize: '2rem'}}>🍽️</div>
+              <h4>{recentOrders.length}</h4>
+              <small>Food Orders Logged</small>
+            </Card.Body>
+          </Card>
+        </Col>
+        <Col md={3}>
+          <Card className="text-center h-100">
+            <Card.Body>
+              <div style={{fontSize: '2rem'}}>🏥</div>
+              <h4>{quickInsights ? Math.round(quickInsights.overall_assessment?.overall_risk_score * 100) : '--'}</h4>
+              <small>Overall Health Score</small>
+              {quickInsights && (
+                <div className="mt-2">
+                  <Badge bg={getHealthScoreColor(quickInsights.overall_assessment.overall_risk_score * 100)}>
+                    {quickInsights.overall_assessment.health_status.replace('_', ' ').toUpperCase()}
+                  </Badge>
+                </div>
+              )}
+            </Card.Body>
+          </Card>
+        </Col>
+        <Col md={3}>
+          <Card className="text-center h-100">
+            <Card.Body>
+              <div style={{fontSize: '2rem'}}>🤖</div>
+              <h4>Active</h4>
+              <small>AI Insights</small>
+              <div className="mt-2">
+                <Badge bg="success">Live</Badge>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
 
-        {/* Main Content */}
-        <Row>
-          {/* Profile Section */}
-          <Col md={4}>
-            <Card className="profile-card mb-4">
-              <Card.Header className="bg-white">
-                <h5 className="mb-0">👤 Profile Overview</h5>
-              </Card.Header>
-              <Card.Body>
-                <div className="mb-3">
-                  <strong>Name:</strong> {user?.name}
+      {/* Recent Activity & Insights */}
+      <Row>
+        <Col md={6}>
+          <Card>
+            <Card.Header>
+              <h6 className="mb-0">🍽️ Recent Food Orders</h6>
+            </Card.Header>
+            <Card.Body>
+              {recentOrders.length === 0 ? (
+                <div className="text-center py-3">
+                  <p className="text-muted">No food orders yet</p>
+                  <Button href="/food-tracking" variant="primary" size="sm">
+                    Log Your First Order
+                  </Button>
                 </div>
-                <div className="mb-3">
-                  <strong>Email:</strong> {user?.email}
-                </div>
-                <div className="mb-3">
-                  <strong>Member Since:</strong><br/>
-                  <small className="text-muted">{new Date(user?.createdAt).toLocaleDateString()}</small>
-                </div>
-                
-                {healthProfile?.basicInfo?.age && (
-                  <>
-                    <hr/>
-                    <div className="mb-2">
-                      <strong>Age:</strong> {healthProfile.basicInfo.age} years
+              ) : (
+                <div>
+                  {recentOrders.slice(0, 3).map((order, index) => (
+                    <div key={index} className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                      <div>
+                        <strong>{order.orderInfo?.restaurant?.name}</strong>
+                        <br />
+                        <small className="text-muted">{order.items?.length} items • {Math.round(order.analysis?.totalCalories || 0)} calories</small>
+                      </div>
+                      <Badge bg={getHealthScoreColor(order.analysis?.healthScore || 70)}>
+                        {order.analysis?.healthScore || 70}/100
+                      </Badge>
                     </div>
-                    {healthProfile.basicInfo.height?.value && (
-                      <div className="mb-2">
-                        <strong>Height:</strong> {healthProfile.basicInfo.height.value} {healthProfile.basicInfo.height.unit}
-                      </div>
-                    )}
-                    {healthProfile.basicInfo.weight?.value && (
-                      <div className="mb-2">
-                        <strong>Weight:</strong> {healthProfile.basicInfo.weight.value} {healthProfile.basicInfo.weight.unit}
-                      </div>
-                    )}
-                  </>
-                )}
-                
-                <hr/>
-                
-                <div className="mb-2">
-                  <strong>Health Profile</strong>
-                  <div className="progress progress-custom mt-2">
-                    <div 
-                      className="progress-bar progress-bar-custom" 
-                      style={{ width: `${completionPercentage}%` }}
-                    ></div>
-                  </div>
-                </div>
-                <small className="text-muted mt-1 d-block mb-3">
-                  {completionPercentage === 100 ? 
-                    'Profile complete! 🎉' : 
-                    'Complete your health profile for better recommendations'
-                  }
-                </small>
-                
-                <Button as={Link} to="/health-profile" variant="primary" size="sm" className="w-100">
-                  {completionPercentage === 0 ? 'Start Health Profile' : 'Update Health Profile'}
-                </Button>
-              </Card.Body>
-            </Card>
-          </Col>
-          
-          {/* Quick Actions */}
-          <Col md={8}>
-            <Card className="mb-4">
-              <Card.Header className="bg-white">
-                <h5 className="mb-0">🚀 Quick Actions</h5>
-              </Card.Header>
-              <Card.Body>
-                <Row>
-                  <Col md={6} className="mb-3">
-                    <Card className="feature-card">
-                      <Card.Body className="text-center">
-                        <div style={{fontSize: '3rem'}}>📋</div>
-                        <h6 className="mt-2">Complete Health Profile</h6>
-                        <p className="text-muted small">Fill out your complete health information for personalized recommendations</p>
-                        <Button as={Link} to="/health-profile" variant="primary" size="sm">
-                          {completionPercentage === 0 ? 'Get Started' : 'Continue'}
-                        </Button>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                  
-                  <Col md={6} className="mb-3">
-                    <Card className="feature-card">
-                      <Card.Body className="text-center">
-                        <div style={{fontSize: '3rem'}}>🍕</div>
-                        <h6 className="mt-2">Food Tracking</h6>
-                        <p className="text-muted small">Monitor your food orders and get instant health warnings</p>
-                        <div className="coming-soon-badge">Coming in Phase 3!</div>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                  
-                  <Col md={6} className="mb-3">
-                    <Card className="feature-card">
-                      <Card.Body className="text-center">
-                        <div style={{fontSize: '3rem'}}>🤖</div>
-                        <h6 className="mt-2">AI Recommendations</h6>
-                        <p className="text-muted small">Get personalized health and food suggestions</p>
-                        <div className="coming-soon-badge">Coming in Phase 4!</div>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                  
-                  <Col md={6} className="mb-3">
-                    <Card className="feature-card">
-                      <Card.Body className="text-center">
-                        <div style={{fontSize: '3rem'}}>📈</div>
-                        <h6 className="mt-2">Health Reports</h6>
-                        <p className="text-muted small">View detailed analytics of your health progress</p>
-                        <div className="coming-soon-badge">Coming Soon!</div>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                </Row>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-
-        {/* Health Insights */}
-        <Row>
-          <Col md={12}>
-            <Card>
-              <Card.Header className="bg-white">
-                <h5 className="mb-0">💡 Health Insights</h5>
-              </Card.Header>
-              <Card.Body>
-                {completionPercentage > 0 ? (
-                  <div>
-                    <h6>Based on your health profile:</h6>
-                    <ul className="mb-0">
-                      {healthProfile?.dietaryInfo?.dietType && (
-                        <li>You follow a <strong>{healthProfile.dietaryInfo.dietType}</strong> diet</li>
-                      )}
-                      {healthProfile?.medicalHistory?.allergies?.length > 0 && (
-                        <li>You have <strong>{healthProfile.medicalHistory.allergies.length}</strong> known allergies</li>
-                      )}
-                      {healthProfile?.lifestyle?.activityLevel && (
-                        <li>Your activity level is <strong>{healthProfile.lifestyle.activityLevel.replace('-', ' ')}</strong></li>
-                      )}
-                      {completionPercentage === 100 && (
-                        <li className="text-success">✅ Your profile is complete! You'll get personalized recommendations soon.</li>
-                      )}
-                    </ul>
-                  </div>
-                ) : (
-                  <div className="text-center py-4">
-                    <div style={{fontSize: '4rem', opacity: 0.3}}>📊</div>
-                    <h6 className="text-muted">Complete your health profile to see personalized insights</h6>
-                    <Button as={Link} to="/health-profile" variant="primary" className="mt-2">
-                      Start Health Profile
+                  ))}
+                  <div className="text-center mt-3">
+                    <Button href="/food-tracking" variant="outline-primary" size="sm">
+                      View All Orders
                     </Button>
                   </div>
-                )}
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
-    </div>
+                </div>
+              )}
+            </Card.Body>
+          </Card>
+        </Col>
+
+        <Col md={6}>
+          <Card>
+            <Card.Header>
+              <h6 className="mb-0">🤖 AI Health Insights</h6>
+            </Card.Header>
+            <Card.Body>
+              {!healthProfile || healthProfile.completionPercentage < 50 ? (
+                <Alert variant="info">
+                  <strong>Complete Your Profile</strong>
+                  <p className="mb-2">Get personalized AI insights by completing your health profile.</p>
+                  <Button href="/health-profile" variant="primary" size="sm">
+                    Complete Profile
+                  </Button>
+                </Alert>
+              ) : quickInsights ? (
+                <div>
+                  {quickInsights.priority_actions?.slice(0, 3).map((action, index) => (
+                    <div key={index} className="mb-2">
+                      <div className="d-flex align-items-start">
+                        <span className="me-2">💡</span>
+                        <small>{action}</small>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="text-center mt-3">
+                    <Button href="/ml-insights" variant="outline-primary" size="sm">
+                      View Full AI Analysis
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-3">
+                  <p className="text-muted">Log some food orders to get AI insights</p>
+                  <Button href="/food-tracking" variant="primary" size="sm">
+                    Start Food Tracking
+                  </Button>
+                </div>
+              )}
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+
+      {/* Quick Actions */}
+      <Row className="mt-4">
+        <Col md={12}>
+          <Card>
+            <Card.Header>
+              <h6 className="mb-0">🚀 Quick Actions</h6>
+            </Card.Header>
+            <Card.Body>
+              <Row>
+                <Col md={3} className="text-center mb-3">
+                  <Button href="/health-profile" variant="outline-primary" className="w-100">
+                    📋 Update Health Profile
+                  </Button>
+                </Col>
+                <Col md={3} className="text-center mb-3">
+                  <Button href="/food-tracking" variant="outline-success" className="w-100">
+                    🍽️ Log Food Order
+                  </Button>
+                </Col>
+                <Col md={3} className="text-center mb-3">
+                  <Button href="/ml-insights" variant="outline-info" className="w-100">
+                    🤖 AI Recommendations
+                  </Button>
+                </Col>
+                <Col md={3} className="text-center mb-3">
+                  <Button href="/ml-insights" variant="outline-warning" className="w-100">
+                    🏥 Health Risk Analysis
+                  </Button>
+                </Col>
+              </Row>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+    </Container>
   );
 };
 

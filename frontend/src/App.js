@@ -10,7 +10,8 @@ import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import Dashboard from './pages/Dashboard';
 import HealthProfile from './pages/HealthProfile';
-import FoodTracking from './pages/FoodTracking';  // Add this import
+import FoodTracking from './pages/FoodTracking';
+import MLInsights from './pages/MLInsights';  // Add this import
 
 // Import AuthContext
 import { AuthProvider } from './contexts/AuthContext';
@@ -47,6 +48,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <FoodTracking />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/ml-insights" 
+                element={
+                  <ProtectedRoute>
+                    <MLInsights />
                   </ProtectedRoute>
                 } 
               />

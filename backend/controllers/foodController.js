@@ -2,6 +2,9 @@ const Food = require('../models/Food');
 const FoodOrder = require('../models/FoodOrder');
 const HealthProfile = require('../models/HealthProfile');
 const usdaService = require('../services/usdaService');
+const axios = require('axios');
+
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5001';
 
 // @desc    Search foods (USDA + Local DB)
 // @route   GET /api/food/search?q=query
@@ -17,29 +20,48 @@ const searchFoods = async (req, res) => {
       });
     }
 
+    console.log(`Searching USDA for: "${q}"`); // Debug log
+
     // Search USDA database
     const usdaResults = await usdaService.searchFoods(q, parseInt(limit));
     
-    // Convert USDA results to our format
-    const foods = usdaResults.foods ? usdaResults.foods.map(food => 
-      usdaService.convertToOurFormat(food)
-    ) : [];
+    console.log('USDA Results:', { 
+      hasResults: !!usdaResults, 
+      hasFoods: !!(usdaResults && usdaResults.foods),
+      foodCount: usdaResults?.foods?.length || 0 
+    });
+
+    // Safe null check before mapping
+    let foods = [];
+    if (usdaResults && usdaResults.foods && Array.isArray(usdaResults.foods)) {
+      foods = usdaResults.foods.map(food => {
+        try {
+          return usdaService.convertToOurFormat(food);
+        } catch (convertError) {
+          console.error('Error converting food:', convertError);
+          return null;
+        }
+      }).filter(food => food !== null); // Remove failed conversions
+    }
     
     res.json({
       success: true,
       data: foods,
       count: foods.length,
       source: 'usda',
-      totalHits: usdaResults.totalHits || 0
+      totalHits: usdaResults?.totalHits || 0
     });
+    
   } catch (error) {
     console.error('Search foods error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error searching foods'
+      message: 'Server error searching foods',
+      error: error.message // Include error details for debugging
     });
   }
 };
+
 
 // @desc    Get food details from USDA
 // @route   GET /api/food/usda/:fdcId
@@ -196,6 +218,177 @@ const getUserOrders = async (req, res) => {
   }
 };
 
+// @desc    Get order by ID
+// @route   GET /api/food/order/:id
+// @access  Private
+const getOrderById = async (req, res) => {
+  try {
+    const order = await FoodOrder.findOne({
+      _id: req.params.id,
+      user: req.user.id
+    });
+    
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: order
+    });
+  } catch (error) {
+    console.error('Get order error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error getting order'
+    });
+  }
+};
+
+// @desc    Get ML-powered food recommendations
+// @route   POST /api/food/recommendations
+// @access  Private
+const getMLRecommendations = async (req, res) => {
+  try {
+    const { available_foods, n_recommendations = 10 } = req.body;
+    const userId = req.user.id;
+    
+    if (!available_foods || available_foods.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'available_foods array is required'
+      });
+    }
+
+    // Get user's health profile
+    const healthProfile = await HealthProfile.findOne({ user: userId });
+    
+    // Get user's recent orders
+    const recentOrders = await FoodOrder.find({ user: userId })
+      .sort({ 'orderInfo.orderDate': -1 })
+      .limit(20);
+
+    // Prepare data for ML service
+    const mlRequest = {
+      user_id: userId,
+      health_profile: healthProfile ? healthProfile.toObject() : {},
+      order_history: recentOrders.map(order => order.toObject()),
+      available_foods: available_foods,
+      n_recommendations: n_recommendations
+    };
+
+    console.log('Calling ML service with:', {
+      user_id: userId,
+      has_health_profile: !!healthProfile,
+      order_count: recentOrders.length,
+      food_count: available_foods.length
+    });
+
+    // Call ML service
+    const mlResponse = await axios.post(`${ML_SERVICE_URL}/recommend`, mlRequest, {
+      timeout: 10000,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (mlResponse.data.success) {
+      res.json({
+        success: true,
+        recommendations: mlResponse.data.recommendations,
+        model_status: mlResponse.data.model_status,
+        total_found: mlResponse.data.total_found
+      });
+    } else {
+      throw new Error('ML service returned error');
+    }
+
+  } catch (error) {
+    console.error('ML recommendations error:', error.message);
+    
+    // Fallback to basic recommendations
+    const basicRecommendations = req.body.available_foods.slice(0, req.body.n_recommendations || 10).map(food => ({
+      food: food,
+      confidence_score: 0.5,
+      health_score: 0.5,
+      reasoning: 'Basic recommendation (ML service unavailable)',
+      recommendation_type: 'fallback'
+    }));
+
+    res.json({
+      success: true,
+      recommendations: basicRecommendations,
+      model_status: 'fallback',
+      total_found: basicRecommendations.length
+    });
+  }
+};
+
+// @desc    Get health risk assessment
+// @route   GET /api/food/health-risk
+// @access  Private
+const getHealthRiskAssessment = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Get user's health profile
+    const healthProfile = await HealthProfile.findOne({ user: userId });
+    
+    if (!healthProfile) {
+      return res.json({
+        success: false,
+        message: 'Complete your health profile to get risk assessment'
+      });
+    }
+    
+    // Get user's recent orders
+    const recentOrders = await FoodOrder.find({ user: userId })
+      .sort({ 'orderInfo.orderDate': -1 })
+      .limit(50);
+
+    // Prepare data for ML service
+    const mlRequest = {
+      user_id: userId,
+      health_profile: healthProfile.toObject(),
+      order_history: recentOrders.map(order => order.toObject())
+    };
+
+    console.log('Calling ML risk assessment with:', {
+      user_id: userId,
+      order_count: recentOrders.length
+    });
+
+    // Call ML service
+    const mlResponse = await axios.post(`${ML_SERVICE_URL}/health-risk`, mlRequest, {
+      timeout: 15000,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (mlResponse.data.success) {
+      res.json({
+        success: true,
+        risk_assessment: mlResponse.data.risk_assessment
+      });
+    } else {
+      throw new Error('ML service returned error');
+    }
+
+  } catch (error) {
+    console.error('Health risk assessment error:', error.message);
+    res.json({
+      success: false,
+      message: 'Health risk assessment currently unavailable'
+    });
+  }
+};
+
+// Helper Functions (existing ones)
+
 // @desc    Basic order analysis without health profile
 const basicOrderAnalysis = async (order) => {
   const analysis = {
@@ -323,30 +516,7 @@ module.exports = {
   getUSDAFoodDetails,
   createFoodOrder,
   getUserOrders,
-  getOrderById: async (req, res) => {
-    try {
-      const order = await FoodOrder.findOne({
-        _id: req.params.id,
-        user: req.user.id
-      });
-      
-      if (!order) {
-        return res.status(404).json({
-          success: false,
-          message: 'Order not found'
-        });
-      }
-      
-      res.json({
-        success: true,
-        data: order
-      });
-    } catch (error) {
-      console.error('Get order error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Server error getting order'
-      });
-    }
-  }
+  getOrderById,
+  getMLRecommendations,        // NEW
+  getHealthRiskAssessment      // NEW
 };

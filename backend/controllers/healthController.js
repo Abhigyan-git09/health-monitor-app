@@ -291,11 +291,77 @@ const uploadDocument = async (req, res) => {
   });
 };
 
+// Add this function to your existing healthController.js
+const saveHealthTestResults = async (req, res) => {
+  try {
+    const { test_results } = req.body;
+    const userId = req.user.id;
+
+    if (!test_results) {
+      return res.status(400).json({
+        success: false,
+        message: 'Test results are required'
+      });
+    }
+
+    // Find user's health profile
+    let healthProfile = await HealthProfile.findOne({ user: userId });
+    
+    if (!healthProfile) {
+      // Create new health profile if doesn't exist
+      healthProfile = new HealthProfile({
+        user: userId,
+        basicInfo: {},
+        medicalHistory: {},
+        dietaryInfo: {},
+        lifestyle: {},
+        documents: []
+      });
+    }
+
+    // Add health test results
+    healthProfile.healthTestResults = {
+      completed_date: test_results.completed_date,
+      health_score: test_results.health_score,
+      answers: test_results.answers,
+      recommendations: test_results.recommendations,
+      test_type: test_results.test_type || 'self_assessment'
+    };
+
+    // Update completion status
+    healthProfile.completionStatus = healthProfile.completionStatus || {};
+    healthProfile.completionStatus.healthTest = true;
+    
+    // Recalculate completion percentage
+    const completedSections = Object.values(healthProfile.completionStatus).filter(Boolean).length;
+    healthProfile.completionPercentage = (completedSections / 6) * 100; // 6 total sections including health test
+
+    await healthProfile.save();
+
+    res.json({
+      success: true,
+      message: 'Health test results saved successfully',
+      data: healthProfile
+    });
+
+  } catch (error) {
+    console.error('Save health test error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error saving health test results'
+    });
+  }
+};
+
+
+
+
 module.exports = {
   getHealthProfile,
   updateBasicInfo,
   updateMedicalHistory,
   updateDietaryInfo,
   updateLifestyle,
-  uploadDocument
+  uploadDocument,
+  saveHealthTestResults
 };

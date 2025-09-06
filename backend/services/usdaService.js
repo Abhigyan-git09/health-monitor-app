@@ -4,80 +4,74 @@ class USDAService {
   constructor() {
     this.baseURL = 'https://api.nal.usda.gov/fdc/v1';
     this.apiKey = process.env.USDA_API_KEY;
+    console.log('USDA API Key loaded:', this.apiKey ? 'YES' : 'NO');
   }
 
-  // Search for foods in USDA database
   async searchFoods(query, pageSize = 25, pageNumber = 1) {
     try {
-      const response = await axios.post(`${this.baseURL}/foods/search`, {
+      console.log(`🔍 USDA Search: "${query}" with key: ${this.apiKey}`);
+      
+      const requestPayload = {
         query: query,
         pageSize: pageSize,
         pageNumber: pageNumber,
         sortBy: 'dataType.keyword',
         sortOrder: 'asc'
-      }, {
-        params: {
-          api_key: this.apiKey
+      };
+
+      console.log('📤 USDA Request:', requestPayload);
+
+      const response = await axios.post(`${this.baseURL}/foods/search?api_key=${this.apiKey}`, requestPayload, {
+        timeout: 15000,
+        headers: {
+          'Content-Type': 'application/json'
         }
+      });
+
+      console.log('📥 USDA Response Status:', response.status);
+      console.log('📥 USDA Response Data:', {
+        totalHits: response.data?.totalHits,
+        foodCount: response.data?.foods?.length,
+        firstFood: response.data?.foods?.[0]?.description
       });
 
       return response.data;
     } catch (error) {
-      console.error('USDA API search error:', error.response?.data || error.message);
-      throw new Error('Failed to search USDA food database');
-    }
-  }
-
-  // Get detailed food information by FDC ID
-  async getFoodDetails(fdcId) {
-    try {
-      const response = await axios.get(`${this.baseURL}/food/${fdcId}`, {
-        params: {
-          api_key: this.apiKey
-        }
+      console.error('❌ USDA API Error:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
       });
-
-      return response.data;
-    } catch (error) {
-      console.error('USDA API details error:', error.response?.data || error.message);
-      throw new Error('Failed to get food details from USDA');
+      return { foods: [], totalHits: 0 };
     }
   }
 
-  // Convert USDA food data to our format
   convertToOurFormat(usdaFood) {
+    if (!usdaFood) return null;
+
     const nutrients = {};
     
-    // Map USDA nutrients to our format
-    if (usdaFood.foodNutrients) {
+    if (usdaFood.foodNutrients && Array.isArray(usdaFood.foodNutrients)) {
       usdaFood.foodNutrients.forEach(nutrient => {
+        if (!nutrient?.nutrient?.name) return;
+        
         const name = nutrient.nutrient.name.toLowerCase();
         const value = nutrient.amount || 0;
         
-        if (name.includes('energy') || name.includes('calorie')) {
-          nutrients.calories = value;
-        } else if (name.includes('protein')) {
-          nutrients.protein = value;
-        } else if (name.includes('carbohydrate')) {
-          nutrients.carbs = value;
-        } else if (name.includes('total lipid') || name.includes('fat')) {
-          nutrients.fat = value;
-        } else if (name.includes('fiber')) {
-          nutrients.fiber = value;
-        } else if (name.includes('sugars')) {
-          nutrients.sugar = value;
-        } else if (name.includes('sodium')) {
-          nutrients.sodium = value;
-        } else if (name.includes('cholesterol')) {
-          nutrients.cholesterol = value;
-        }
+        if (name.includes('energy')) nutrients.calories = value;
+        else if (name.includes('protein')) nutrients.protein = value;
+        else if (name.includes('carbohydrate')) nutrients.carbs = value;
+        else if (name.includes('total lipid')) nutrients.fat = value;
+        else if (name.includes('fiber')) nutrients.fiber = value;
+        else if (name.includes('sugars')) nutrients.sugar = value;
+        else if (name.includes('sodium')) nutrients.sodium = value;
       });
     }
 
     return {
       fdcId: usdaFood.fdcId,
-      name: usdaFood.description || usdaFood.lowercaseDescription,
-      category: this.categorizeFood(usdaFood),
+      name: usdaFood.description || 'Unknown Food',
+      category: 'main-course',
       nutrition: {
         calories: nutrients.calories || 0,
         protein: nutrients.protein || 0,
@@ -85,31 +79,10 @@ class USDAService {
         fat: nutrients.fat || 0,
         fiber: nutrients.fiber || 0,
         sugar: nutrients.sugar || 0,
-        sodium: nutrients.sodium || 0,
-        cholesterol: nutrients.cholesterol || 0
+        sodium: nutrients.sodium || 0
       },
-      ingredients: usdaFood.ingredients ? [usdaFood.ingredients] : [],
       source: 'usda'
     };
-  }
-
-  // Basic food categorization
-  categorizeFood(usdaFood) {
-    const name = (usdaFood.description || '').toLowerCase();
-    
-    if (name.includes('pizza') || name.includes('burger') || name.includes('fries')) {
-      return 'fast-food';
-    } else if (name.includes('salad') || name.includes('vegetable')) {
-      return 'healthy';
-    } else if (name.includes('chicken') || name.includes('beef') || name.includes('fish')) {
-      return 'main-course';
-    } else if (name.includes('cake') || name.includes('ice cream') || name.includes('cookie')) {
-      return 'dessert';
-    } else if (name.includes('coffee') || name.includes('tea') || name.includes('juice')) {
-      return 'beverage';
-    } else {
-      return 'main-course';
-    }
   }
 }
 

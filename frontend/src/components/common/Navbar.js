@@ -25,7 +25,8 @@ const Navbar = () => {
               <>
                 <Nav.Link as={Link} to="/dashboard">Dashboard</Nav.Link>
                 <Nav.Link as={Link} to="/health-profile">Health Profile</Nav.Link>
-                <Nav.Link as={Link} to="/food-tracking">Food Tracking</Nav.Link>  {/* Add this link */}
+                <Nav.Link as={Link} to="/food-tracking">Food Tracking</Nav.Link>
+                <Nav.Link as={Link} to="/ml-insights">🤖 AI Insights</Nav.Link>  {/* Add this link */}
                 <Nav.Item className="mx-2">
                   <span className="text-muted">Welcome, {user?.name}</span>
                 </Nav.Item>
